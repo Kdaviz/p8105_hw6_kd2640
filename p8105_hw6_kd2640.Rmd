@@ -1,0 +1,225 @@
+---
+title: "Homework 6 Linear Models"
+author: "Keyanna Davis"
+date: "11/14/2019"
+output: github_document
+---
+
+```{r setup, include=FALSE}
+library(tidyverse)
+library(modelr)
+library(mgcv)
+knitr::opts_chunk$set(
+	echo = TRUE,
+	warning = FALSE,
+	fig.width = 8, 
+  fig.height = 6,
+  out.width = "90%"
+)
+options(
+  ggplot2.continuous.colour = "viridis",
+  ggplot2.continuous.fill = "viridis"
+)
+scale_colour_discrete = scale_colour_viridis_d
+scale_fill_discrete = scale_fill_viridis_d
+theme_set(theme_minimal() + theme(legend.position = "bottom"))
+
+
+set.seed(1)
+```
+
+# Problem 0
+
+This “problem” focuses on structure of your submission, especially the use git and GitHub for reproducibility, R Projects to organize your work, R Markdown to write reproducible reports, relative paths to load data from local files, and reasonable naming structures for your files. To that end:
+
+* create a public GitHub repo + local R Project; we suggest naming this repo / directory p8105_hw6_YOURUNI (e.g. p8105_hw6_ajg2202 for Jeff), but that’s not required
+* create a single .Rmd file named p8105_hw6_YOURUNI.Rmd that renders to github_document
+* create a subdirectory to store the local data files used in the assignment, and use relative paths to access these data files
+submit a link to your repo via Courseworks
+
+Your solutions to Problems 1 and 2 should be implemented in your .Rmd file, and your git commit history should reflect the process you used to solve these Problems.
+
+For this Problem, we will assess adherence to the instructions above regarding repo structure, git commit history, and whether we are able to knit your .Rmd to ensure that your work is reproducible. Adherence to appropriate styling and clarity of code will be assessed in Problems 1+ using the style rubric.
+
+This homework includes figures; the readability of your embedded plots (e.g. font sizes, axis labels, titles) will be assessed in Problems 1+.
+
+# Problem 1
+
+In this problem, you will analyze data gathered to understand the effects of several variables on a child’s birthweight. This dataset, available here, consists of roughly 4000 children and includes the following variables:
+
+* babysex: baby’s sex (male = 1, female = 2)
+* bhead: baby’s head circumference at birth (centimeters)
+* blength: baby’s length at birth (centimeteres)
+* bwt: baby’s birth weight (grams)
+* delwt: mother’s weight at delivery (pounds)
+* fincome: family monthly income (in hundreds, rounded)
+* frace: father’s race (1 = White, 2 = Black, 3 = Asian, 4 = Puerto Rican, 8 = Other, 9 = Unknown)
+* gaweeks: gestational age in weeks
+* malform: presence of malformations that could affect weight (0 = absent, 1 = present)
+* menarche: mother’s age at menarche (years)
+* mheigth: mother’s height (inches)
+* momage: mother’s age at delivery (years)
+* mrace: mother’s race (1 = White, 2 = Black, 3 = Asian, 4 = Puerto Rican, 8 = Other)
+* parity: number of live births prior to this pregnancy
+* pnumlbw: previous number of low birth weight babies
+* pnumgsa: number of prior small for gestational age babies
+* ppbmi: mother’s pre-pregnancy BMI
+* ppwt: mother’s pre-pregnancy weight (pounds)
+* smoken: average number of cigarettes smoked per day during pregnancy
+* wtgain: mother’s weight gain during pregnancy (pounds)
+
+Load and clean the data for regression analysis (i.e. convert numeric to factor where appropriate, check for missing data, etc.).
+
+```{r}
+birthweight = read.csv("./data/birthweight.csv") %>%
+  janitor::clean_names() %>%
+  mutate(
+    babysex = as.factor(babysex),
+    frace = as.factor(frace),
+    malform = as.factor(malform),
+    mrace = as.factor(mrace)
+  ) 
+#birthweight %>% 
+  #skimr::skim()
+birthweight = 
+  birthweight %>% 
+  select(-pnumlbw, -pnumsga)
+```
+
+### Problem 1.2
+Propose a regression model for birthweight. This model may be based on a hypothesized structure for the factors that underly birthweight, on a data-driven model-building process, or a combination of the two. Describe your modeling process and show a plot of model residuals against fitted values – use add_predictions and add_residuals in making this plot.
+
+Note that although we expect your model to be reasonable, model building itself is not a main idea of the course and we don’t necessarily expect your model to be “optimal”.
+
+```{r}
+birthwt =
+birthweight %>% 
+  mutate(
+    smokes =  if_else(smoken > 0, '1', '0'),
+    smokes = as.factor(smokes)
+  ) 
+ fit = lm(bwt ~ bhead + blength + delwt + gaweeks + malform + smokes, data = birthwt)
+ summary(fit)
+ bwt_model1 = lm(bwt ~ bhead + blength + delwt + gaweeks + smokes, data = birthwt)
+ summary(bwt_model1)
+ 
+ birthwt %>% 
+  add_predictions(bwt_model1) %>% 
+  add_residuals (bwt_model1) %>% 
+  ggplot(aes(x = pred, y = resid)) + 
+    geom_point(alpha = 0.3) +
+   #ylim(-1000,1000) +
+  labs(
+        title = "Hypothesized Regression Model: Residuals vs. Predicted Values",
+        x = "Predicted Birthweight (grams)",
+        y = "Residuals"
+      )
+```
+
+I hypothesized my model based off what I thought would be the best predictors of birthweight. I first fitted a model with `baby head circumference at birth`, `baby's length at birth`, `mother's weight at delivery`, `gastational age in weeks`, `presence of malformations that could affect weight` and `whether or not the women smoked during the pregnancy`. I chose to make `smoken` a binary variable because I felt that if a mother smoked during the pregnancy that it will affect the birthweight regardless rather than how much she smoked. After looking at the summmary of the fitted model I noticed that the `presence of malformations` was not significant when compared to those babies without the presence of malformations when it comes to birthweight. So for my second model I fitted I removed `presence of malformations` and just kept all the other predictors. 
+
+After graphing the residuals vs predictors I notice a cluster of values on the right side of the graph and I see a few outliers on the left side at the top of the graph. So maybe this is not the best fitted model. 
+
+
+
+
+Compare your model to two others:
+
+* One using length at birth and gestational age as predictors (main effects only)
+* One using head circumference, length, sex, and all interactions (including the three-way interaction) between these
+
+
+```{r}
+bwt_model2 = lm(bwt ~ blength + gaweeks, data = birthwt)
+summary(bwt_model2)
+
+bwt_model3 = lm(bwt ~ bhead * blength * babysex, data = birthwt)
+summary(bwt_model3)
+```
+
+Make this comparison in terms of the cross-validated prediction error; use crossv_mc and functions in purrr as appropriate.
+
+```{r}
+cv_birthwt =
+ crossv_mc(birthwt, 4342)
+```
+
+```{r}
+cv_birthwt %>% 
+  pull(train) %>% .[[1]] %>% as_tibble()
+```
+
+```{r}
+cv_birthwt = 
+  cv_birthwt %>% 
+  mutate(bwt_model1 = map(train, ~bwt_model1),
+         bwt_model2 = map(train, ~bwt_model2),
+         bwt_model3= map(train, ~bwt_model3)) %>% 
+  mutate(rmse_bwt_model1 = map2_dbl(bwt_model1, test, ~rmse(model = .x, data = .y)),
+         rmse_bwt_model2 = map2_dbl(bwt_model2, test, ~rmse(model = .x, data = .y)),
+         rmse_bwt_model3 = map2_dbl(bwt_model3, test, ~rmse(model = .x, data = .y)))
+```
+
+```{r}
+cv_birthwt %>% 
+  select(starts_with("rmse")) %>% 
+  pivot_longer(
+    everything(),
+    names_to = "model",
+    values_to = "rmse",
+    names_prefix = "rmse"
+  ) %>%
+  mutate( model = str_sub(model, 2)) %>% 
+  mutate(
+         model = recode(
+           model, 
+           bwt_model1 = "Hypothesized Model", 
+           bwt_model2 = "Small Model",
+          bwt_model3 = "Model with Interactions"), 
+         model = fct_inorder(model)) %>% 
+  ggplot(aes(x = model, y = rmse, color = model)) + 
+  geom_violin() +
+  theme(legend.position = "none") +
+  labs(
+        title = "Comparing predictive birthweight models by RMSE",
+        x = "Models",
+        y = "RMSE"
+      ) 
+
+```
+
+When comparing the three models, the hypothesized model is the model I would choose because it has the smallest RMSE. The small model has the largest RMSEs and the interaction model has a small RMSE as well but not as small as the hypothesized model. The interaction model will e harder to interpret, so hypothesized model is a better choice to use. 
+
+# Problem 2
+
+For this problem, we’ll use the 2017 Central Park weather data that we’ve seen elsewhere. The code chunk below (adapted from the course website) will download these data.
+
+```{r}
+weather_df = 
+  rnoaa::meteo_pull_monitors(
+    c("USW00094728"),
+    var = c("PRCP", "TMIN", "TMAX"), 
+    date_min = "2017-01-01",
+    date_max = "2017-12-31") %>%
+  mutate(
+    name = recode(id, USW00094728 = "CentralPark_NY"),
+    tmin = tmin / 10,
+    tmax = tmax / 10) %>%
+  select(name, id, everything())
+```
+
+
+The bootstrap is helpful when you’d like to perform inference for a parameter / value / summary that doesn’t have an easy-to-write-down distribution in the usual repeated sampling framework. We’ll focus on a simple linear regression with tmax as the response and tmin as the predictor, and are interested in the distribution of two quantities estimated from these data:
+
+* r̂2
+* log(β̂0∗β̂1)
+
+Use 5000 bootstrap samples and, for each bootstrap sample, produce estimates of these two quantities. Plot the distribution of your estimates, and describe these in words. Using the 5000 bootstrap estimates, identify the 2.5% and 97.5% quantiles to provide a 95% confidence interval for r̂2
+ and log(β̂0∗β̂1)
+. Note: broom::glance() is helpful for extracting r̂2
+ from a fitted regression, and broom::tidy() (with some additional wrangling) should help in computing log(β̂0∗β̂1)
+
+```{r}
+
+```
+
