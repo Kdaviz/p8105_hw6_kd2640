@@ -70,7 +70,7 @@ In this problem, you will analyze data gathered to understand the effects of sev
 
 Load and clean the data for regression analysis (i.e. convert numeric to factor where appropriate, check for missing data, etc.).
 
-```{r}
+```{r, clean_data}
 birthweight = read.csv("./data/birthweight.csv") %>%
   janitor::clean_names() %>%
   mutate(
@@ -86,20 +86,21 @@ birthweight =
   select(-pnumlbw, -pnumsga)
 ```
 
-### Problem 1.2
+### Problem 1.1
+
 Propose a regression model for birthweight. This model may be based on a hypothesized structure for the factors that underly birthweight, on a data-driven model-building process, or a combination of the two. Describe your modeling process and show a plot of model residuals against fitted values – use add_predictions and add_residuals in making this plot.
 
 Note that although we expect your model to be reasonable, model building itself is not a main idea of the course and we don’t necessarily expect your model to be “optimal”.
 
-```{r}
+```{r, hypothesized_model}
 birthwt =
 birthweight %>% 
   mutate(
     smokes =  if_else(smoken > 0, '1', '0'),
     smokes = as.factor(smokes)
   ) 
- fit = lm(bwt ~ bhead + blength + delwt + gaweeks + malform + smokes, data = birthwt)
- summary(fit)
+ bwt_model = lm(bwt ~ bhead + blength + delwt + gaweeks + malform + smokes, data = birthwt)
+ summary(bwt_model)
  bwt_model1 = lm(bwt ~ bhead + blength + delwt + gaweeks + smokes, data = birthwt)
  summary(bwt_model1)
  
@@ -107,7 +108,7 @@ birthweight %>%
   add_predictions(bwt_model1) %>% 
   add_residuals (bwt_model1) %>% 
   ggplot(aes(x = pred, y = resid)) + 
-    geom_point(alpha = 0.3) +
+    geom_point(alpha = 0.5) +
    #ylim(-1000,1000) +
   labs(
         title = "Hypothesized Regression Model: Residuals vs. Predicted Values",
@@ -116,12 +117,12 @@ birthweight %>%
       )
 ```
 
-I hypothesized my model based off what I thought would be the best predictors of birthweight. I first fitted a model with `baby head circumference at birth`, `baby's length at birth`, `mother's weight at delivery`, `gastational age in weeks`, `presence of malformations that could affect weight` and `whether or not the women smoked during the pregnancy`. I chose to make `smoken` a binary variable because I felt that if a mother smoked during the pregnancy that it will affect the birthweight regardless rather than how much she smoked. After looking at the summmary of the fitted model I noticed that the `presence of malformations` was not significant when compared to those babies without the presence of malformations when it comes to birthweight. So for my second model I fitted I removed `presence of malformations` and just kept all the other predictors. 
+I hypothesized my model based off what I thought would be the best predictors of birthweight. I first fitted a model with `baby head circumference at birth`, `baby's length at birth`, `mother's weight at delivery`, `gastational age in weeks`, `presence of malformations that could affect weight` and `whether or not the women smoked during the pregnancy`. I chose to make `smoken` a binary variable because I felt that if a mother smoked during the pregnancy that it will affect the birthweight regardless rather than how much she smoked. After looking at the summmary of my fitted model `bwt_model` I noticed that the `presence of malformations` was not significant when compared to those babies without the presence of malformations when it comes to birthweight. So for my second model I fitted `bwt_model1` I removed `presence of malformations` and just kept all the other predictors. 
 
 After graphing the residuals vs predictors I notice a cluster of values on the right side of the graph and I see a few outliers on the left side at the top of the graph. So maybe this is not the best fitted model. 
 
 
-
+### Problem 1.2
 
 Compare your model to two others:
 
@@ -129,7 +130,7 @@ Compare your model to two others:
 * One using head circumference, length, sex, and all interactions (including the three-way interaction) between these
 
 
-```{r}
+```{r, build_models}
 bwt_model2 = lm(bwt ~ blength + gaweeks, data = birthwt)
 summary(bwt_model2)
 
@@ -137,19 +138,17 @@ bwt_model3 = lm(bwt ~ bhead * blength * babysex, data = birthwt)
 summary(bwt_model3)
 ```
 
+### Problem 1.3
+
 Make this comparison in terms of the cross-validated prediction error; use crossv_mc and functions in purrr as appropriate.
 
-```{r}
+```{r, crossvalidation}
 cv_birthwt =
- crossv_mc(birthwt, 4342)
+ crossv_mc(birthwt, 100)
 ```
 
-```{r}
-cv_birthwt %>% 
-  pull(train) %>% .[[1]] %>% as_tibble()
-```
 
-```{r}
+```{r, train_test_models}
 cv_birthwt = 
   cv_birthwt %>% 
   mutate(bwt_model1 = map(train, ~bwt_model1),
@@ -160,7 +159,8 @@ cv_birthwt =
          rmse_bwt_model3 = map2_dbl(bwt_model3, test, ~rmse(model = .x, data = .y)))
 ```
 
-```{r}
+
+```{r, graph_models}
 cv_birthwt %>% 
   select(starts_with("rmse")) %>% 
   pivot_longer(
@@ -169,13 +169,12 @@ cv_birthwt %>%
     values_to = "rmse",
     names_prefix = "rmse"
   ) %>%
-  mutate( model = str_sub(model, 2)) %>% 
-  mutate(
-         model = recode(
-           model, 
-           bwt_model1 = "Hypothesized Model", 
-           bwt_model2 = "Small Model",
-          bwt_model3 = "Model with Interactions"), 
+  mutate(model = str_sub(model, 2)) %>% 
+  mutate(model = 
+           recode(model, 
+           bwt_model1 = "bwt ~ bhead + blength + delwt + gaweeks + smokes", 
+           bwt_model2 = "bwt ~ blength + gaweeks",
+          bwt_model3 = "bwt ~ bhead * blength * babysex"), 
          model = fct_inorder(model)) %>% 
   ggplot(aes(x = model, y = rmse, color = model)) + 
   geom_violin() +
@@ -188,13 +187,13 @@ cv_birthwt %>%
 
 ```
 
-When comparing the three models, the hypothesized model is the model I would choose because it has the smallest RMSE. The small model has the largest RMSEs and the interaction model has a small RMSE as well but not as small as the hypothesized model. The interaction model will e harder to interpret, so hypothesized model is a better choice to use. 
+When comparing the three models, the first model is the model I would choose because it has the smallest RMSE. The second model has the largest RMSEs and the third model has a small RMSE as well but not as small as the first model. The interaction model will be much harder to interpret, so first model is a better choice to use. 
 
 # Problem 2
 
 For this problem, we’ll use the 2017 Central Park weather data that we’ve seen elsewhere. The code chunk below (adapted from the course website) will download these data.
 
-```{r}
+```{r, weather_df}
 weather_df = 
   rnoaa::meteo_pull_monitors(
     c("USW00094728"),
@@ -219,7 +218,87 @@ Use 5000 bootstrap samples and, for each bootstrap sample, produce estimates of 
 . Note: broom::glance() is helpful for extracting r̂2
  from a fitted regression, and broom::tidy() (with some additional wrangling) should help in computing log(β̂0∗β̂1)
 
-```{r}
+### Problem 2.1
 
+* Bootstrap and Distribution of r̂2
+
+```{r, rsquared}
+boot_straps = 
+weather_df %>% 
+  bootstrap(n = 5000) %>% 
+  mutate(
+   models = map(strap, ~lm(tmax ~ tmin, data = .x)),
+    results = map(models, broom::glance)) %>% 
+    select(-strap, -models) %>% 
+  unnest(results) %>% 
+  janitor::clean_names() 
+
+boot_straps %>% 
+  ggplot(aes(x = r_squared)) +
+  geom_density() +
+   labs(
+    title = "Distribution of Rsquared",
+    x = "Rsquared",
+    y = "Density"
+  ) 
+ 
 ```
 
+The plot shows the dstribution is negatively skewed, which may just indicate that there may be some outliers present. 
+
+### Problem 2.2
+
+* Bootstrap and Distribution of log(β̂0∗β̂1)
+
+
+```{r, log}
+boot_straps2 =
+weather_df %>% 
+  bootstrap(n = 5000)  %>% 
+  mutate(
+    models = map(strap, ~lm(tmax ~ tmin, data = .x)),
+    results = map(models, broom::tidy)) %>% 
+   select(-strap, -models) %>% 
+  unnest(results) %>% 
+  janitor::clean_names() %>% 
+    select(id, term, estimate) %>% 
+  pivot_wider(
+    names_from = term,
+    values_from = estimate
+  ) %>% 
+  janitor::clean_names() %>% 
+  mutate(
+   log = log(intercept * tmin)
+  )
+  boot_straps2 %>% 
+  ggplot(aes(x = log)) +
+  geom_density() +
+  labs(
+    title = "Distribution of Log(B0*B1)",
+    x = "Log(B0*B1)", 
+    y = "Density"
+  )
+```
+
+
+The graph shows close to a symmetrical distribution but the tail on the left side is a little longer than on the right side, so it may be a few outliers but not many.
+
+### Problem 2.3
+
+Using the 5000 bootstrap estimates, identify the 2.5% and 97.5% quantiles to provide a 95% confidence interval for r̂2
+ and log(β̂0∗β̂1)
+ 
+```{r, CI}
+
+CI_lower = quantile(pull(boot_straps, r_squared), probs = .025)
+CI_upper = quantile(pull(boot_straps, r_squared), probs = .975)
+
+CI_lower2 = quantile(pull(boot_straps2, log), probs = .025)
+CI_upper2 = quantile(pull(boot_straps2, log), probs = .975)
+
+
+```
+ 
+The 95% confidence interval for `r_squared` is (`r CI_lower`, `r CI_upper`).
+
+The 95% confidence interval for `log(b0*b1)` is (`r CI_lower2`, `r CI_upper2`).
