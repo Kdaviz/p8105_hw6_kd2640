@@ -86,6 +86,10 @@ birthweight =
   select(-pnumlbw, -pnumsga)
 ```
 
+
+The `birthweight` dataset has `r nrow(birthweight)` and `r ncol(birthweight)` after I removed two of the columns `previous number of low birthweight babies(pnumlbw)` and `number of of prior small for gestational age babies(pnumsga)`. I removed these two variables because when I looked through the dataset I notice that all valvues for these columns were `0` so I felt there wasn't a point in having these variables in the dataset. 
+
+
 ### Problem 1.1
 
 Propose a regression model for birthweight. This model may be based on a hypothesized structure for the factors that underly birthweight, on a data-driven model-building process, or a combination of the two. Describe your modeling process and show a plot of model residuals against fitted values – use add_predictions and add_residuals in making this plot.
@@ -176,8 +180,8 @@ cv_birthwt %>%
            bwt_model2 = "bwt ~ blength + gaweeks",
           bwt_model3 = "bwt ~ bhead * blength * babysex"), 
          model = fct_inorder(model)) %>% 
-  ggplot(aes(x = model, y = rmse, color = model)) + 
-  geom_violin() +
+  ggplot(aes(x = model, y = rmse, fill = model)) + 
+  geom_violin(alpha = .4) +
   theme(legend.position = "none") +
   labs(
         title = "Comparing predictive birthweight models by RMSE",
