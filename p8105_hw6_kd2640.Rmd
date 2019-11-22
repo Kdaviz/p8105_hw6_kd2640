@@ -1,7 +1,7 @@
 ---
 title: "Homework 6 Linear Models"
 author: "Keyanna Davis"
-date: "11/14/2019"
+date: "11/25/2019"
 output: github_document
 ---
 
@@ -299,7 +299,6 @@ CI_upper = quantile(pull(boot_straps, r_squared), probs = .975)
 
 CI_lower2 = quantile(pull(boot_straps2, log), probs = .025)
 CI_upper2 = quantile(pull(boot_straps2, log), probs = .975)
-
 
 ```
  
